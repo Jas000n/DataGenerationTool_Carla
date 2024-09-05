@@ -13,7 +13,7 @@ chmod +x setup_carla.sh
 ```shell
 ./carla/CarlaUE4.sh -RenderOffScreen
 ```
-### Start Carla 
+### or Start Carla with visualization
 ```shell
 ./carla/CarlaUE4.sh 
 ```
