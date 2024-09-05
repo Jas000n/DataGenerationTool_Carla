@@ -22,4 +22,6 @@ chmod +x setup_carla.sh
 ./data_collect.sh
 ```
 ## Check Distribution
+```shell
 python check_lidar_category_distribution.py
+```
