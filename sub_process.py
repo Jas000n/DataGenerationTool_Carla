@@ -245,7 +245,9 @@ def main(map="Town01",weather = carla.WeatherParameters(
         else:
             print('No suitable spawn points available for NPCs')
             return -1
-
+    if len(all_vehicles) < 40:
+        print('No enough npc')
+        return -1
     for v in all_vehicles:
         print("set!")
         v.set_autopilot(True, tm.get_port())
@@ -346,7 +348,7 @@ def random_weather():
 
     return weather
 if __name__ == '__main__':
-    Towns = ["Town01_Opt", "Town02_Opt", "Town03_Opt", "Town04_Opt", "Town05_Opt", "Town10HD_Opt"]
+    Towns = ["Town01_Opt", "Town02_Opt", "Town03_Opt", "Town04_Opt", "Town05_Opt"]
     random_map = Towns[random.randint(0, 4)]
     weather = random_weather()
     main(random_map,weather)
