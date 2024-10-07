@@ -1,12 +1,12 @@
 import json
 import math
 import os
-import subprocess
+import sys
 from pathlib import Path
 from queue import Queue
 from datetime import datetime
 import yaml
-
+from utils.generate_video import images_to_video
 
 import carla
 import random
@@ -162,21 +162,21 @@ def main(map="Town01",weather = carla.WeatherParameters(
     )):
     init_pygame()
     ############ setup world  ###############################
-    num_NPC = 100
-    proximity_range = 100
-    min_npc_distance = 0
-    min_ego_npc_distance = 0
-    client = carla.Client('localhost', 2000)
-    client.set_timeout(100.0)
-    tm = configure_traffic_manager(client)
-    world = client.load_world(map)
-    world.set_weather(weather)
-    traffic_lights = world.get_actors().filter('traffic.traffic_light')
-    settings = world.get_settings()
-    settings.synchronous_mode = True
-    settings.fixed_delta_seconds = 0.1
-    world.apply_settings(settings)
-    #################  spawn npc and ego ########
+    try:
+        client = carla.Client('localhost', 2000)
+        client.set_timeout(20.0)
+        tm = configure_traffic_manager(client)
+        world = client.load_world(map)
+        world.set_weather(weather)
+        traffic_lights = world.get_actors().filter('traffic.traffic_light')
+        settings = world.get_settings()
+        settings.synchronous_mode = True
+        settings.fixed_delta_seconds = 0.1
+        world.apply_settings(settings)
+    except Exception as e:
+        print("Cannot find carla on port 2000")
+        sys.exit(100)
+    #################  spawn ego ########
     blueprint_library = world.get_blueprint_library()
 
     all_vehicle_blueprints = list(blueprint_library.filter('vehicle.*'))
@@ -191,7 +191,7 @@ def main(map="Town01",weather = carla.WeatherParameters(
     if not car_bp:
         print("Car blueprint 'vehicle.tesla.model3' not found.")
         pygame.quit()
-        return
+        sys.exit(-1)
 
     spawn_point = random.choice(world.get_map().get_spawn_points())
     ego_vehicle = try_spawn_vehicle(world, car_bp, spawn_point)
@@ -201,53 +201,25 @@ def main(map="Town01",weather = carla.WeatherParameters(
         return
     all_vehicles.append(ego_vehicle)
     print('Created %s' % ego_vehicle.type_id)
-    npc_positions = []
-    sum = 0
-    truck_count = 0
-    total_NPC = num_NPC
-    failed_spawn = 0
-    while sum < num_NPC:
-        nearby_spawn_points = [
-            sp for sp in world.get_map().get_spawn_points()
-            if proximity_range >= sp.location.distance(ego_vehicle.get_location()) > min_ego_npc_distance
-        ]
+    #################### generate NPC #####################
+    num_npcs = 15
+    for _ in range(num_npcs):
 
-        valid_spawn_points = [
-            sp for sp in nearby_spawn_points
-            if all(sp.location.distance(npc) > min_npc_distance for npc in npc_positions)
-        ]
+        npc_blueprint = random.choice(blueprint_library.filter('vehicle.*'))
 
-        if valid_spawn_points:
-            # Sort the valid spawn points by their distance to the ego vehicle in ascending order
-            valid_spawn_points.sort(key=lambda sp: sp.location.distance(ego_vehicle.get_location()))
-            # Select the closest valid spawn point
-            if sum%2 == 0 and sum+failed_spawn< len(valid_spawn_points):
-                npc_spawn_point = valid_spawn_points[sum+failed_spawn]
-            else:
-                npc_spawn_point = random.choice(valid_spawn_points)
-            if truck_count / total_NPC < 0.20:
-                npc_bp = random.choice(all_truck_blueprints)
-                truck_count += 1
-            else:
-                npc_bp = random.choice(all_vehicle_blueprints)
 
-            npc_vehicle = try_spawn_vehicle(world, npc_bp, npc_spawn_point)
-            if npc_vehicle:
-                all_vehicles.append(npc_vehicle)
-                npc_positions.append(npc_vehicle.get_location())
-                sum += 1
-                print('Spawned NPC %s at %s' % (npc_vehicle.type_id, npc_spawn_point.location))
-            else:
-                print('Failed to spawn NPC vehicle at %s' % npc_spawn_point.location)
-                failed_spawn+=1
-                if(failed_spawn >1000):
-                    break
-        else:
-            print('No suitable spawn points available for NPCs')
-            return -1
-    if len(all_vehicles) < 40:
-        print('No enough npc')
-        return -1
+        location = spawn_point.location
+        location.x += random.uniform(-5, 5)
+        location.y += random.uniform(-5, 5)
+        spawn_point.location = location
+
+        npc = world.try_spawn_actor(npc_blueprint, spawn_point)
+        if npc is not None:
+            all_vehicles.append(npc)
+            print(f"NPC spawned at {spawn_point.location}")
+    if len(all_vehicles)<10:
+        print("not enough npc!")
+        sys.exit(1)
     for v in all_vehicles:
         print("set!")
         v.set_autopilot(True, tm.get_port())
@@ -311,6 +283,7 @@ def main(map="Town01",weather = carla.WeatherParameters(
             if ticks%5 == 0: # 2hz as NuScenes setup
                 print("should save data now!!!")
                 save_unit_data(sensor_data_frame,"./output"+ "/" + formatted_time + "/task0",ticks,lidar_specs,ego_vehicle)
+        images_to_video("./output"+ "/" + formatted_time + "/task0/camera_video_purpose","./output"+ "/" + formatted_time + "/task0/task.mp4")
         print("finished this round!!")
         flag = True
 
@@ -329,9 +302,9 @@ def main(map="Town01",weather = carla.WeatherParameters(
         pygame.quit()
         del client
         if flag:
-            return 0
+            sys.exit(0)
         else:
-            return 1
+            sys.exit(1)
 
 
 def random_weather():
@@ -348,7 +321,8 @@ def random_weather():
 
     return weather
 if __name__ == '__main__':
-    Towns = ["Town01_Opt", "Town02_Opt", "Town03_Opt", "Town04_Opt", "Town05_Opt"]
-    random_map = Towns[random.randint(0, 4)]
+    Towns = ["Town01_Opt", "Town02_Opt", "Town03_Opt", "Town04_Opt", "Town05_Opt","Town10HD_Opt"]
+    random_map = Towns[random.randint(0, 5)]
     weather = random_weather()
-    main(random_map,weather)
+    main(random_map)
+    # main(random_map, weather)
