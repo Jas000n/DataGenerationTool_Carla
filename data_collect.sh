@@ -1,7 +1,7 @@
 #!/bin/bash
 
 count=0
-while [ $count -lt 1 ]
+while [ $count -lt 100 ]
 do
     echo "Attempting run number $((count+1))..."
     python sub_process.py

@@ -155,11 +155,9 @@ def try_spawn_vehicle(world, blueprint, spawn_point, retries=5):
             return vehicle
     return None
 
-def main(map="Town01",weather = carla.WeatherParameters(
-        cloudiness=80.0,  # 云量
-        precipitation_deposits =70.0,  # 降水量
-        sun_altitude_angle=70.0  # 太阳的高度角
-    )):
+def main(map="Town01",weather=None):
+    second_per_scene = 20
+    save_frequency = 5 #save data at frequency 5hz
     init_pygame()
     ############ setup world  ###############################
     try:
@@ -167,7 +165,8 @@ def main(map="Town01",weather = carla.WeatherParameters(
         client.set_timeout(20.0)
         tm = configure_traffic_manager(client)
         world = client.load_world(map)
-        world.set_weather(weather)
+        if weather != None:
+            world.set_weather(weather)
         traffic_lights = world.get_actors().filter('traffic.traffic_light')
         settings = world.get_settings()
         settings.synchronous_mode = True
@@ -231,8 +230,6 @@ def main(map="Town01",weather = carla.WeatherParameters(
         traffic_light.freeze(True)
     sensor_list = []
     sensor_queue = Queue()
-    batch_sensor_data = []
-    lidar_specs = {}
 
     ################# setup sensors ############
     sensor_data_frame = {}
@@ -265,7 +262,7 @@ def main(map="Town01",weather = carla.WeatherParameters(
         print("Start driving！！！")
         now = datetime.now()
         formatted_time = now.strftime('%Y_%m_%d_%H_%M_%S')
-        while ticks<200:
+        while ticks < second_per_scene*10:
 
             world.tick()
             for i in range(0, len(sensor_list)):
