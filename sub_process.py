@@ -318,8 +318,13 @@ def random_weather():
 
     return weather
 if __name__ == '__main__':
-    Towns = ["Town01_Opt", "Town02_Opt", "Town03_Opt", "Town04_Opt", "Town05_Opt","Town10HD_Opt"]
-    random_map = Towns[random.randint(0, 5)]
-    weather = random_weather()
-    main(random_map)
-    # main(random_map, weather)
+    #Towns = ["Town01_Opt", "Town02_Opt", "Town03_Opt", "Town04_Opt", "Town05_Opt","Town10HD_Opt"]
+    Towns = ["Town01_Opt", "Town02_Opt", "Town03_Opt", "Town05_Opt","Town10HD_Opt"]
+    random_map = Towns[random.randint(0, 4)]
+    #weather = random_weather()
+    clear_weather = carla.WeatherParameters(
+    cloudiness=0.0,
+    precipitation=0.0,
+    sun_altitude_angle=90.0  )
+    #main(random_map)
+    main(random_map, clear_weather)
