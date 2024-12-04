@@ -1,4 +1,5 @@
 # DataGenerationTool_Carla
+![random_explore.gif](pics/random_explore.gif)
 ## Install
 ```shell
 git clone https://github.com/Jas000n/DataGenerationTool_Carla
