@@ -1,4 +1,5 @@
 # DataGenerationTool_Carla
+## Preview of the Town Setup
 ![random_explore.gif](pics/random_explore.gif)
 ## Install
 ```shell
@@ -10,15 +11,15 @@ chmod +x setup_carla.sh
 ./setup_carla.sh
 ```
 ## Run
-### Start Carla with screen off
+### Start Carla with Screen off
 ```shell
 ./carla/CarlaUE4.sh -RenderOffScreen
 ```
-### or Start Carla with visualization
+### or Start Carla with Visualization
 ```shell
 ./carla/CarlaUE4.sh 
 ```
-### Start Bash to collect data
+### Start Bash to Collect Data
 ```shell
 ./data_collect.sh
 ```
