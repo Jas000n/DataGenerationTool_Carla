@@ -1,10 +1,10 @@
 import os
-import numpy as np
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from tqdm import tqdm
 
-from utils.convertSemanticLabel import  convert_carla2nuScenes, mapping
+from utils.convertSemanticLabel import convert_carla2nuScenes, mapping
 
 categories = {
     0: "noise",
@@ -26,38 +26,82 @@ categories = {
     16: "vegetation"
 }
 
-
-def read_ply_file(file_path):
-    with open(file_path, 'r') as file:
-        lines = file.readlines()
-    end_header = next(i for i, line in enumerate(lines) if "end_header" in line)
-    data_lines = lines[end_header + 1:]
-    data = np.array([list(map(float, line.split())) for line in data_lines])
-    data = data[:, -1]
-    unique_elements, counts = np.unique(data, return_counts=True)
-    labels_dict = dict(zip(unique_elements, counts))
-    return labels_dict
+LIDAR_DIRS = {"lidar_01", "lidar_02", "lidar_03", "lidar_04", "lidar_05"}
 
 
-def scan_directory(base_dir):
-    category_distribution = defaultdict(int)
+def read_ply_file(file_path: str) -> dict[int, int]:
+
+    counts = defaultdict(int)
+    with open(file_path, "r") as f:
+        # 跳过 header
+        for line in f:
+            if "end_header" in line:
+                break
+        else:
+            # 没找到 end_header，直接返回空
+            return {}
+
+        # 统计 body
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split()
+            try:
+                label = int(float(parts[-1]))  # 兼容 "1" / "1.0"
+            except (ValueError, IndexError):
+                continue
+            counts[label] += 1
+
+    return dict(counts)
+
+
+def _is_lidar_path(path: str) -> bool:
+
+    parts = set(os.path.normpath(path).split(os.sep))
+    return bool(parts & LIDAR_DIRS)
+
+
+def collect_ply_files(base_dir: str) -> list[str]:
     all_files = []
-    for root, dirs, files in os.walk(base_dir):
-        if any(lidar in root for lidar in ["lidar_01", "lidar_02", "lidar_03", "lidar_04", "lidar_05"]):
-            all_files.extend([os.path.join(root, file) for file in files if file.endswith('.ply')])
+    for root, _, files in os.walk(base_dir):
+        if _is_lidar_path(root):
+            for fn in files:
+                if fn.endswith(".ply"):
+                    all_files.append(os.path.join(root, fn))
+    return all_files
 
-    for file_path in tqdm(all_files, desc="Processing PLY files"):
-        labels_dict = read_ply_file(file_path)
-        for key, count in labels_dict.items():
-            category_distribution[key] += count
+
+def scan_directory(base_dir: str, max_workers: int | None = None) -> dict[str, int]:
+    category_distribution = defaultdict(int)
+
+    all_files = collect_ply_files(base_dir)
+    if not all_files:
+        return {}
+
+
+    if max_workers is None:
+        cpu = os.cpu_count() or 4
+        max_workers = min(32, cpu * 4)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(read_ply_file, fp) for fp in all_files]
+
+        for fut in tqdm(as_completed(futures), total=len(futures), desc="Processing PLY files"):
+            labels_dict = fut.result()
+            for key, count in labels_dict.items():
+                category_distribution[key] += count
 
     converted_distribution = convert_carla2nuScenes(category_distribution, mapping)
+
+  
     return {categories[k]: v for k, v in converted_distribution.items()}
 
 
 if __name__ == "__main__":
-    base_dir = './output'
-    distribution = scan_directory(base_dir)
+    base_dir = "./output"
+    distribution = scan_directory(base_dir)  # 也可以 scan_directory(base_dir, max_workers=16)
+
     print(distribution)
     for category, count in sorted(distribution.items()):
         print(f"{category}: {count}")
